@@ -2,22 +2,9 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { AuthDialog } from "@/components/auth-dialog"
-import {
-  MapPin,
-  Navigation,
-  Droplets,
-  Phone,
-  Users,
-  Shield,
-} from "lucide-react"
+import { MapPin, Navigation, Droplets, Phone, Users, Shield } from "lucide-react"
 import Image from "next/image"
 
 export function LandingPage() {
@@ -73,12 +60,8 @@ export function LandingPage() {
                 />
               </div>
               <div>
-                <h1 className="text-xl md:text-2xl font-bold">
-                  Magal bu Touba
-                </h1>
-                <p className="text-xs md:text-sm opacity-90">
-                  Téere bu wayfar
-                </p>
+                <h1 className="text-xl md:text-2xl font-bold">Magal bu Touba</h1>
+                <p className="text-xs md:text-sm opacity-90">Téere bu wayfar</p>
               </div>
             </div>
             <Button
@@ -100,14 +83,11 @@ export function LandingPage() {
           <section className="container mx-auto px-4 py-12 md:py-20">
             <div className="max-w-4xl mx-auto text-center space-y-6">
               <h2 className="text-3xl md:text-5xl font-bold">
-                <span className="text-primary">
-                  Dalal ak jamm ci Magal bu Touba
-                </span>
+                <span className="text-primary">Dalal ak jamm ci Magal bu Touba</span>
               </h2>
               <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
-                Votre compagnon numérique pour vivre pleinement le pèlerinage.
-                Accédez à tous les services essentiels, naviguez facilement et
-                restez connecté.
+                Votre compagnon numérique pour vivre pleinement le pèlerinage. Accédez à tous les services essentiels,
+                naviguez facilement et restez connecté.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
                 <Button
@@ -133,29 +113,18 @@ export function LandingPage() {
           <section id="features" className="container mx-auto px-4 py-12 md:py-20">
             <div className="max-w-5xl mx-auto">
               <div className="text-center space-y-4 mb-12">
-                <h3 className="text-2xl md:text-4xl font-bold">
-                  Fonctionnalités complètes
-                </h3>
-                <p className="text-muted-foreground text-lg">
-                  Tout ce dont vous avez besoin pour un pèlerinage serein
-                </p>
+                <h3 className="text-2xl md:text-4xl font-bold">Fonctionnalités complètes</h3>
+                <p className="text-muted-foreground text-lg">Tout ce dont vous avez besoin pour un pèlerinage serein</p>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
                 {features.map((feature, index) => (
-                  <Card
-                    key={index}
-                    className="hover:shadow-lg transition-shadow border-green-50"
-                  >
+                  <Card key={index} className="hover:shadow-lg transition-shadow border-green-50">
                     <CardHeader>
                       <feature.icon className="h-8 w-8 md:h-10 md:w-10 text-green-600 mb-2" />
-                      <CardTitle className="text-base md:text-lg">
-                        {feature.title}
-                      </CardTitle>
+                      <CardTitle className="text-base md:text-lg">{feature.title}</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <CardDescription>
-                        {feature.description}
-                      </CardDescription>
+                      <CardDescription>{feature.description}</CardDescription>
                     </CardContent>
                   </Card>
                 ))}
@@ -188,15 +157,12 @@ export function LandingPage() {
         {/* Footer toujours en bas */}
         <footer className="border-t bg-background w-full py-6">
           <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-            <p>Magal bu Touba  – Guide du Pèlerin</p>
+            <p>Magal bu Touba – Guide du Pèlerin</p>
           </div>
         </footer>
       </div>
 
-      <AuthDialog
-        open={authDialogOpen}
-        onOpenChange={setAuthDialogOpen}
-      />
+      <AuthDialog open={authDialogOpen} onOpenChange={setAuthDialogOpen} />
     </>
   )
 }

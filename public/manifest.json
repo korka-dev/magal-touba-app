@@ -1,0 +1,38 @@
+{
+  "name": "Magal de Touba - Guide du Pèlerin",
+  "short_name": "Magal Touba",
+  "description": "Application web pour accompagner les pèlerins pendant le Magal de Touba avec géolocalisation, navigation et services essentiels",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#16a34a",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/images/logo-magal.jpg",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/images/logo-magal.jpg",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["travel", "navigation", "utilities"],
+  "lang": "fr",
+  "dir": "ltr",
+  "scope": "/",
+  "id": "/",
+  "screenshots": [
+    {
+      "src": "/images/screenshot-mobile.png",
+      "sizes": "540x720",
+      "type": "image/png",
+      "form_factor": "narrow"
+    }
+  ]
+}
+
