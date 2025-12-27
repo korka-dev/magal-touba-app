@@ -1,300 +1,296 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { loadGoogleMapsScript } from "@/lib/google-maps-loader"
-import { TOUBA_CENTER, type Location } from "@/lib/mock-data"
 import { Loader2 } from "lucide-react"
-import { Card, CardContent } from "@/components/ui/card"
-import { Navigation } from "lucide-react"
-
-declare global {
-  interface Window {
-    google: any
-  }
-}
+import type { Location } from "@/lib/mock-data"
 
 interface MapViewProps {
   locations: Location[]
-  selectedLocation?: Location | null
-  onLocationSelect?: (location: Location) => void
-  showRoute?: boolean
+  selectedLocation: Location | null
+  onLocationSelect: (location: Location) => void
+  showRoute: boolean
+  routeMode: "car" | "bike" | "walk" | null
   userLocation?: { lat: number; lng: number }
-  apiKey?: string
+  searchQuery: string
+  activeCategory: string | null
 }
 
-export function MapView({ locations, selectedLocation, onLocationSelect, showRoute, userLocation }: MapViewProps) {
+export function MapView({ 
+  locations, 
+  selectedLocation, 
+  onLocationSelect, 
+  showRoute, 
+  routeMode,
+  userLocation 
+}: MapViewProps) {
   const mapRef = useRef<HTMLDivElement>(null)
-  const [map, setMap] = useState<any>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const leafletMapRef = useRef<any>(null)
   const markersRef = useRef<any[]>([])
-  const directionsRendererRef = useRef<any>(null)
-  const [routeDetails, setRouteDetails] = useState<{
-    distance: string
-    duration: string
-    steps: Array<{ instructions: string; distance: string; duration: string }>
-  } | null>(null)
+  const routeLayerRef = useRef<any>(null)
+  const userMarkerRef = useRef<any>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [leafletLoaded, setLeafletLoaded] = useState(false)
 
+  // Load Leaflet CSS and JS
   useEffect(() => {
-    const initMap = async () => {
-      console.log("[v0] Initialisation de la carte Google Maps...")
-      try {
-        await loadGoogleMapsScript()
-        console.log("[v0] Script Google Maps chargé avec succès")
+    if (typeof window === "undefined") return
 
-        if (!window.google || !window.google.maps) {
-          throw new Error("Google Maps n'est pas disponible")
-        }
-
-        if (mapRef.current && !map) {
-          console.log("[v0] Création de la carte...")
-          const newMap = new window.google.maps.Map(mapRef.current, {
-            center: TOUBA_CENTER,
-            zoom: 14,
-            mapTypeControl: true,
-            streetViewControl: false,
-            fullscreenControl: true,
-            zoomControl: true,
-            styles: [
-              {
-                featureType: "poi",
-                stylers: [{ visibility: "off" }],
-              },
-            ],
-          })
-
-          console.log("[v0] Carte créée avec succès")
-          setMap(newMap)
-          setIsLoading(false)
-        }
-      } catch (error) {
-        console.error("[v0] Erreur lors du chargement de Google Maps:", error)
-        setError(error instanceof Error ? error.message : "Erreur inconnue")
-        setIsLoading(false)
-      }
-    }
-
-    initMap()
-  }, [])
-
-  // Add location markers
-  useEffect(() => {
-    if (!map || !window.google) {
-      console.log("[v0] Carte ou Google Maps non disponible pour ajouter les marqueurs")
+    if ((window as any).L && (window as any).L.polylineDecorator) {
+      setLeafletLoaded(true)
       return
     }
 
-    console.log("[v0] Ajout de", locations.length, "marqueurs sur la carte")
+    const link = document.createElement("link")
+    link.rel = "stylesheet"
+    link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    document.head.appendChild(link)
 
-    markersRef.current.forEach((marker) => marker.setMap(null))
-    markersRef.current = []
-
-    const getMarkerIcon = (type: Location["type"]) => {
-      const colors: Record<Location["type"], string> = {
-        mosquee: "#6B7A3F",
-        thiante: "#9B8B5F",
-        dahira: "#9B8B5F",
-        eau: "#4A90E2",
-        urgence: "#E24A4A",
-        toilette: "#8B7A9B",
-        securite: "#E2A84A",
-        boutique: "#5F8B9B",
-        repos: "#7AB56B",
+    const script = document.createElement("script")
+    script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    script.async = true
+    script.onload = () => {
+      // Charger le plugin polyline decorator
+      const decoratorScript = document.createElement("script")
+      decoratorScript.src = "https://unpkg.com/leaflet-polylinedecorator@1.6.0/dist/leaflet.polylineDecorator.js"
+      decoratorScript.async = true
+      decoratorScript.onload = () => {
+        setLeafletLoaded(true)
       }
+      decoratorScript.onerror = () => {
+        // Si le plugin échoue, continuer quand même
+        setLeafletLoaded(true)
+      }
+      document.head.appendChild(decoratorScript)
+    }
+    document.head.appendChild(script)
 
-      return {
-        path: window.google.maps.SymbolPath.CIRCLE,
-        fillColor: colors[type],
-        fillOpacity: 0.9,
-        strokeColor: "#fff",
-        strokeWeight: 2,
-        scale: 10,
+    return () => {
+      link.remove()
+      script.remove()
+    }
+  }, [])
+
+  // Initialize map
+  useEffect(() => {
+    if (!leafletLoaded || !mapRef.current || leafletMapRef.current) return
+
+    const L = (window as any).L
+    if (!L) return
+
+    const map = L.map(mapRef.current, {
+      center: [14.8516, -15.8777],
+      zoom: 14,
+      zoomControl: true,
+    })
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "&copy; OpenStreetMap",
+      maxZoom: 19,
+    }).addTo(map)
+
+    leafletMapRef.current = map
+    setIsLoading(false)
+
+    return () => {
+      if (leafletMapRef.current) {
+        leafletMapRef.current.remove()
+        leafletMapRef.current = null
       }
     }
+  }, [leafletLoaded])
 
+  // Update user location marker
+  useEffect(() => {
+    if (!leafletMapRef.current || !leafletLoaded || !userLocation) return
+
+    const L = (window as any).L
+    if (!L) return
+
+    // Remove old user marker
+    if (userMarkerRef.current) {
+      userMarkerRef.current.remove()
+    }
+
+    const userIcon = L.divIcon({
+      className: "user-location-marker",
+      html: '<div style="width: 16px; height: 16px; background: #4285F4; border: 3px solid white; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.3);"></div>',
+      iconSize: [22, 22],
+      iconAnchor: [11, 11],
+    })
+
+    const marker = L.marker([userLocation.lat, userLocation.lng], {
+      icon: userIcon,
+      title: "Votre position",
+    }).addTo(leafletMapRef.current)
+
+    userMarkerRef.current = marker
+  }, [leafletLoaded, userLocation])
+
+  // Update markers when locations change
+  useEffect(() => {
+    if (!leafletMapRef.current || !leafletLoaded) return
+
+    const L = (window as any).L
+    if (!L) return
+
+    console.log("[MapView] Updating markers, locations count:", locations.length)
+
+    // Clear existing markers
+    markersRef.current.forEach((marker) => marker.remove())
+    markersRef.current = []
+
+    // Add markers for filtered locations
     locations.forEach((location) => {
-      const marker = new window.google.maps.Marker({
-        position: { lat: location.lat, lng: location.lng },
-        map,
+      const icon = L.divIcon({
+        className: "custom-marker",
+        html: getMarkerHTML(location.type),
+        iconSize: [32, 32],
+        iconAnchor: [16, 16],
+      })
+
+      const marker = L.marker([location.lat, location.lng], {
+        icon,
         title: location.name,
-        icon: getMarkerIcon(location.type),
+        interactive: true,
+        bubblingMouseEvents: false,
+        riseOnHover: true,
       })
 
-      marker.addListener("click", () => {
-        onLocationSelect?.(location)
+      // Attacher l'événement click
+      marker.on("click", (e: any) => {
+        console.log("[MapView] Marker clicked:", location.name)
+        // Empêcher la propagation de l'événement
+        if (e.originalEvent) {
+          e.originalEvent.stopPropagation()
+        }
+        L.DomEvent.stopPropagation(e)
+        // Appeler la fonction de sélection
+        onLocationSelect(location)
       })
 
+      marker.addTo(leafletMapRef.current)
       markersRef.current.push(marker)
     })
 
-    if (userLocation) {
-      const userMarker = new window.google.maps.Marker({
-        position: userLocation,
-        map,
-        title: "Votre position",
-        icon: {
-          path: window.google.maps.SymbolPath.CIRCLE,
-          fillColor: "#4285F4",
-          fillOpacity: 1,
-          strokeColor: "#fff",
-          strokeWeight: 3,
-          scale: 8,
-        },
-      })
-      markersRef.current.push(userMarker)
-    }
+    console.log("[MapView] Total markers added:", markersRef.current.length)
+  }, [leafletLoaded, locations, onLocationSelect])
 
-    console.log("[v0] Marqueurs ajoutés avec succès")
-  }, [map, locations, onLocationSelect, userLocation])
-
-  // Handle route display
+  // Center map on selected location ONLY when route is shown
   useEffect(() => {
-    if (!map || !showRoute || !selectedLocation || !userLocation || !window.google) {
-      if (directionsRendererRef.current) {
-        directionsRendererRef.current.setMap(null)
+    if (selectedLocation && leafletMapRef.current && showRoute) {
+      // En mode itinéraire, on ajuste pour voir tout le trajet
+      // Le fitBounds est déjà géré dans l'effet de route
+    }
+  }, [selectedLocation, showRoute])
+
+  // Draw route when navigation is active
+  useEffect(() => {
+    if (!leafletMapRef.current || !leafletLoaded || !showRoute || !selectedLocation || !userLocation || !routeMode) {
+      if (routeLayerRef.current) {
+        routeLayerRef.current.remove()
+        routeLayerRef.current = null
       }
-      setRouteDetails(null)
       return
     }
 
-    if (!directionsRendererRef.current) {
-      directionsRendererRef.current = new window.google.maps.DirectionsRenderer({
-        map,
-        suppressMarkers: false,
-        polylineOptions: {
-          strokeColor: "#6B7A3F",
-          strokeWeight: 6,
-          strokeOpacity: 0.8,
-        },
+    const L = (window as any).L
+    if (!L) return
+
+    if (routeLayerRef.current) {
+      routeLayerRef.current.remove()
+    }
+
+    const routeCoordinates = [
+      [userLocation.lat, userLocation.lng],
+      [selectedLocation.lat, selectedLocation.lng],
+    ]
+
+    // Couleurs et styles selon le mode de transport
+    const routeStyles = {
+      car: { color: "#4285F4", weight: 5, dashArray: undefined },
+      bike: { color: "#34A853", weight: 4, dashArray: "8, 4" },
+      walk: { color: "#EA4335", weight: 4, dashArray: "4, 8" },
+    }
+
+    const style = routeStyles[routeMode]
+
+    const routeLine = L.polyline(routeCoordinates, {
+      color: style.color,
+      weight: style.weight,
+      opacity: 0.9,
+      dashArray: style.dashArray,
+      lineJoin: "round",
+      lineCap: "round",
+    })
+
+    routeLine.addTo(leafletMapRef.current)
+    routeLayerRef.current = routeLine
+
+    // Ajouter des flèches directionnelles si le plugin est disponible
+    if (L.polylineDecorator) {
+      const arrow = L.polylineDecorator(routeLine, {
+        patterns: [
+          {
+            offset: "50%",
+            repeat: 0,
+            symbol: L.Symbol.arrowHead({
+              pixelSize: 15,
+              polygon: false,
+              pathOptions: {
+                stroke: true,
+                weight: 3,
+                color: style.color,
+                opacity: 0.9,
+              },
+            }),
+          },
+        ],
       })
+      arrow.addTo(leafletMapRef.current)
     }
 
-    const directionsService = new window.google.maps.DirectionsService()
-
-    directionsService.route(
-      {
-        origin: userLocation,
-        destination: { lat: selectedLocation.lat, lng: selectedLocation.lng },
-        travelMode: window.google.maps.TravelMode.WALKING,
-      },
-      (result, status) => {
-        if (status === "OK" && result) {
-          directionsRendererRef.current?.setDirections(result)
-
-          const route = result.routes[0]
-          const leg = route.legs[0]
-
-          setRouteDetails({
-            distance: leg.distance?.text || "",
-            duration: leg.duration?.text || "",
-            steps:
-              leg.steps?.map((step) => ({
-                instructions: step.instructions?.replace(/<[^>]*>/g, "") || "",
-                distance: step.distance?.text || "",
-                duration: step.duration?.text || "",
-              })) || [],
-          })
-        }
-      },
-    )
-  }, [map, showRoute, selectedLocation, userLocation])
-
-  // Pan to selected location
-  useEffect(() => {
-    if (map && selectedLocation) {
-      map.panTo({ lat: selectedLocation.lat, lng: selectedLocation.lng })
-      map.setZoom(16)
-    }
-  }, [map, selectedLocation])
-
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full bg-muted gap-3">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="text-sm text-muted-foreground">Chargement de la carte...</p>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full bg-muted p-6 text-center gap-3">
-        <div className="h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center">
-          <svg className="h-6 w-6 text-destructive" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-            />
-          </svg>
-        </div>
-        <div>
-          <p className="text-sm font-medium">Erreur de chargement</p>
-          <p className="text-xs text-muted-foreground mt-1">{error}</p>
-        </div>
-      </div>
-    )
-  }
+    const bounds = L.latLngBounds(routeCoordinates)
+    leafletMapRef.current.fitBounds(bounds, { padding: [80, 80] })
+  }, [leafletLoaded, showRoute, selectedLocation, userLocation, routeMode])
 
   return (
     <>
-      <div ref={mapRef} className="w-full h-full rounded-lg" style={{ minHeight: "400px" }} />
-      {routeDetails && showRoute && selectedLocation && (
-        <div className="absolute bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-96 z-10">
-          <Card className="shadow-lg border-2">
-            <CardContent className="p-4 space-y-3">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex-1">
-                  <h3 className="font-semibold text-sm mb-1 line-clamp-1">{selectedLocation.name}</h3>
-                  <p className="text-xs text-muted-foreground line-clamp-1">{selectedLocation.address}</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-4 py-2 px-3 bg-primary/10 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <Navigation className="h-4 w-4 text-primary" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Distance</p>
-                    <p className="text-sm font-semibold">{routeDetails.distance}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <svg className="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Durée</p>
-                    <p className="text-sm font-semibold">{routeDetails.duration}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-2 max-h-40 overflow-y-auto">
-                <p className="text-xs font-medium text-muted-foreground">Instructions étape par étape:</p>
-                {routeDetails.steps.map((step, index) => (
-                  <div key={index} className="flex gap-2 text-xs pb-2 border-b last:border-0">
-                    <div className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-medium mt-0.5">
-                      {index + 1}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm leading-tight mb-1">{step.instructions}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {step.distance} • {step.duration}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+      <div ref={mapRef} className="h-full w-full" />
+      {isLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-background">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       )}
     </>
   )
+}
+
+function getMarkerHTML(type: string): string {
+  const colors: Record<string, string> = {
+    mosquee: "#059669",
+    dahira: "#7C3AED",
+    thiante: "#8B5CF6",
+    eau: "#0EA5E9",
+    urgence: "#DC2626",
+    toilette: "#9333EA",
+    securite: "#F97316",
+    boutique: "#14B8A6",
+    repos: "#22C55E",
+  }
+
+  const color = colors[type] || "#F59E0B"
+
+  return `
+    <div style="
+      width: 32px;
+      height: 32px;
+      background: ${color};
+      border: 3px solid white;
+      border-radius: 50%;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      cursor: pointer;
+      pointer-events: auto;
+      transition: transform 0.2s ease;
+    "></div>
+  `
 }

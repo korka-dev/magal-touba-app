@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -43,24 +42,24 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle className="text-2xl">{"Bienvenue"}</DialogTitle>
-          <DialogDescription>{"Connectez-vous pour accéder à tous les services"}</DialogDescription>
+          <DialogTitle className="text-2xl">Dalal ak jamm</DialogTitle>
+          <DialogDescription>Connectez-vous pour accéder à tous les services</DialogDescription>
         </DialogHeader>
 
         <Tabs defaultValue="login" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="login">{"Connexion"}</TabsTrigger>
-            <TabsTrigger value="register">{"Inscription"}</TabsTrigger>
+            <TabsTrigger value="login">Connexion</TabsTrigger>
+            <TabsTrigger value="register">Inscription</TabsTrigger>
           </TabsList>
 
           <TabsContent value="login">
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="login-phone">{"Numéro de téléphone"}</Label>
+                <Label htmlFor="login-phone">Numéro de téléphone</Label>
                 <Input
                   id="login-phone"
                   type="tel"
-                  placeholder="+221 XX XXX XX XX"
+                  placeholder="Entrer votre numéro"
                   value={loginPhone}
                   onChange={(e) => setLoginPhone(e.target.value)}
                   required
@@ -68,9 +67,10 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="login-password">{"Mot de passe"}</Label>
+                <Label htmlFor="login-password">Mot de passe</Label>
                 <Input
                   id="login-password"
+                  placeholder="Entrer votre mot de passe"
                   type="password"
                   value={loginPassword}
                   onChange={(e) => setLoginPassword(e.target.value)}
@@ -79,15 +79,14 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="login-role">{"Type de compte"}</Label>
+                <Label htmlFor="login-role">Type de compte</Label>
                 <Select value={loginRole} onValueChange={(value) => setLoginRole(value as UserRole)}>
                   <SelectTrigger id="login-role">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pelerin">{"Pèlerin"}</SelectItem>
-                    <SelectItem value="responsable">{"Responsable Dahira/Thiante"}</SelectItem>
-                    <SelectItem value="admin">{"Administrateur"}</SelectItem>
+                  <SelectContent className="z-[110]">
+                    <SelectItem value="pelerin">Pèlerin</SelectItem>
+                    <SelectItem value="responsable">Responsable Dahira/Thiante</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -101,11 +100,11 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
           <TabsContent value="register">
             <form onSubmit={handleRegister} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="register-name">{"Nom complet"}</Label>
+                <Label htmlFor="register-name">Nom complet</Label>
                 <Input
                   id="register-name"
                   type="text"
-                  placeholder="Votre nom"
+                  placeholder="Entrer votre nom"
                   value={registerName}
                   onChange={(e) => setRegisterName(e.target.value)}
                   required
@@ -113,11 +112,11 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="register-phone">{"Numéro de téléphone"}</Label>
+                <Label htmlFor="register-phone">Numéro de téléphone</Label>
                 <Input
                   id="register-phone"
                   type="tel"
-                  placeholder="+221 XX XXX XX XX"
+                  placeholder="Entrer votre numéro"
                   value={registerPhone}
                   onChange={(e) => setRegisterPhone(e.target.value)}
                   required
@@ -125,10 +124,11 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="register-password">{"Mot de passe"}</Label>
+                <Label htmlFor="register-password">Mot de passe</Label>
                 <Input
                   id="register-password"
                   type="password"
+                  placeholder="Entrer votre mot de passe"
                   value={registerPassword}
                   onChange={(e) => setRegisterPassword(e.target.value)}
                   required
@@ -136,14 +136,14 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="register-role">{"Type de compte"}</Label>
+                <Label htmlFor="register-role">Type de compte</Label>
                 <Select value={registerRole} onValueChange={(value) => setRegisterRole(value as UserRole)}>
                   <SelectTrigger id="register-role">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pelerin">{"Pèlerin"}</SelectItem>
-                    <SelectItem value="responsable">{"Responsable Dahira/Thiante"}</SelectItem>
+                  <SelectContent className="z-[110]">
+                    <SelectItem value="pelerin">Pèlerin</SelectItem>
+                    <SelectItem value="responsable">Responsable Dahira/Thiante</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

@@ -2,130 +2,89 @@
 
 import { useState, useEffect } from "react"
 import { useAuth } from "@/lib/auth-context"
+import { WelcomePage } from "@/components/welcome-page"
 import { MapView } from "@/components/map-view"
 import { SearchBar } from "@/components/search-bar"
 import { LocationCard } from "@/components/location-card"
+import { RouteOptionsDialog } from "@/components/route-options-dialog"
+import { ActiveRoutePanel } from "@/components/active-route-panel"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { mockLocations, type Location, TOUBA_CENTER } from "@/lib/mock-data"
-import {
-  Droplets,
-  Phone,
-  MapPin,
-  Navigation,
-  Home,
-  Shield,
-  ShoppingBag,
-  Armchair,
-  Activity,
-  LogOut,
-  User,
-  Clock,
-} from "lucide-react"
+import { X } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
-import { ScrollArea } from "@/components/ui/scroll-area"
+import { Header } from "@/components/header"
 import { ResponsableInterface } from "@/components/responsable-interface"
 
 export function MainInterface() {
-  const { user, logout } = useAuth()
+  const { user } = useAuth()
   const { toast } = useToast()
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null)
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | undefined>(undefined)
   const [searchQuery, setSearchQuery] = useState("")
-  const [activeFilter, setActiveFilter] = useState<Location["type"] | "all">("all")
+  const [activeFilter, setActiveFilter] = useState<Location["type"] | null>(null)
   const [showRoute, setShowRoute] = useState(false)
+  const [showRouteOptions, setShowRouteOptions] = useState(false)
+  const [routeMode, setRouteMode] = useState<"car" | "bike" | "walk" | null>(null)
   const [checkedInLocations, setCheckedInLocations] = useState<Set<string>>(new Set())
-  const [mosqueeSheetOpen, setMosqueeSheetOpen] = useState(false)
-  const [locationsSheetOpen, setLocationsSheetOpen] = useState(false)
 
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          })
-          console.log("[v0] Position obtenue:", position.coords)
-        },
-        (error) => {
-          let errorMessage = "Impossible d'obtenir votre position"
-
-          switch (error.code) {
-            case error.PERMISSION_DENIED:
-              errorMessage = "Permission de géolocalisation refusée. Utilisation de la position par défaut."
-              break
-            case error.POSITION_UNAVAILABLE:
-              errorMessage = "Position non disponible. Utilisation de la position par défaut."
-              break
-            case error.TIMEOUT:
-              errorMessage = "Délai d'attente dépassé. Utilisation de la position par défaut."
-              break
-          }
-
-          console.warn("[v0]", errorMessage, error.message)
-
-          // Fallback to Touba center
-          setUserLocation(TOUBA_CENTER)
-
-          toast({
-            title: "Géolocalisation",
-            description: errorMessage,
-            variant: "default",
-          })
-        },
-        {
-          enableHighAccuracy: false,
-          timeout: 10000,
-          maximumAge: 0,
-        },
-      )
-    } else {
+    try {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            setUserLocation({
+              lat: position.coords.latitude,
+              lng: position.coords.longitude,
+            })
+          },
+          () => {
+            setUserLocation(TOUBA_CENTER)
+          },
+          {
+            enableHighAccuracy: false,
+            timeout: 10000,
+            maximumAge: 0,
+          },
+        )
+      } else {
+        setUserLocation(TOUBA_CENTER)
+      }
+    } catch (error) {
       setUserLocation(TOUBA_CENTER)
-      toast({
-        title: "Géolocalisation non disponible",
-        description: "Utilisation de la position par défaut (Touba)",
-      })
     }
-  }, [toast])
+  }, [])
 
-  const filteredLocations = mockLocations.filter((location) => {
-    const matchesSearch =
-      searchQuery === "" ||
-      location.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      location.address.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredLocations = searchQuery
+    ? mockLocations.filter(
+        (location) =>
+          location.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          location.address.toLowerCase().includes(searchQuery.toLowerCase()),
+      )
+    : activeFilter
+      ? mockLocations.filter((location) => location.type === activeFilter)
+      : mockLocations
 
-    const matchesFilter = activeFilter === "all" || location.type === activeFilter
-
-    return matchesSearch && matchesFilter
-  })
-
-  const handleGetDirections = (location: Location) => {
+  const handleLocationSelect = (location: Location) => {
+    console.log("[MapClick] Location selected:", location.name)
     setSelectedLocation(location)
-    setShowRoute(true)
-    setMosqueeSheetOpen(false)
-    setLocationsSheetOpen(false)
-    toast({
-      title: "Navigation démarrée",
-      description: `Itinéraire vers ${location.name}`,
-    })
+    setShowRoute(false)
+    setRouteMode(null)
   }
 
-  const handleStopNavigation = () => {
-    setShowRoute(false)
-    setSelectedLocation(null)
+  const handleGetDirections = (location: Location) => {
+    console.log("[Directions] Opening route options for:", location.name)
+    setShowRouteOptions(true)
+  }
+
+  const handleSelectRoute = (mode: "car" | "bike" | "walk") => {
+    console.log("[Route] Selected mode:", mode)
+    setRouteMode(mode)
+    setShowRoute(true)
+    
     toast({
-      title: "Navigation arrêtée",
-      description: "Vous pouvez chercher un nouveau lieu",
+      title: "Navigation démarrée",
+      description: `Itinéraire ${mode === "car" ? "en voiture" : mode === "bike" ? "à vélo" : "à pied"} vers ${selectedLocation?.name}`,
     })
   }
 
@@ -140,192 +99,160 @@ export function MainInterface() {
     }
 
     setCheckedInLocations((prev) => new Set(prev).add(location.id))
-
     toast({
       title: "Enregistrement réussi",
       description: `Vous êtes maintenant enregistré à ${location.name}`,
     })
   }
 
-  const filterButtons = [
-    { type: "all" as const, label: "Tous", icon: MapPin },
-    { type: "dahira" as const, label: "Dahiras", icon: Home },
-    { type: "thiante" as const, label: "Thiantes", icon: Activity },
-    { type: "eau" as const, label: "Eau", icon: Droplets },
-    { type: "urgence" as const, label: "Urgences", icon: Phone },
-    { type: "toilette" as const, label: "Toilettes", icon: Home },
-    { type: "securite" as const, label: "Sécurité", icon: Shield },
-    { type: "boutique" as const, label: "Boutiques", icon: ShoppingBag },
-    { type: "repos" as const, label: "Repos", icon: Armchair },
+  const handleCloseLocation = () => {
+    setSelectedLocation(null)
+    setShowRoute(false)
+    setRouteMode(null)
+  }
+
+  const calculateDistance = () => {
+    if (!userLocation || !selectedLocation) return 0
+    const R = 6371
+    const dLat = ((selectedLocation.lat - userLocation.lat) * Math.PI) / 180
+    const dLon = ((selectedLocation.lng - userLocation.lng) * Math.PI) / 180
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((userLocation.lat * Math.PI) / 180) *
+        Math.cos((selectedLocation.lat * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2)
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+    return R * c
+  }
+
+  const calculateDuration = () => {
+    if (!routeMode) return ""
+    const distance = calculateDistance()
+    const speeds = { car: 30, bike: 15, walk: 5 }
+    const hours = distance / speeds[routeMode]
+    const minutes = Math.round(hours * 60)
+    
+    if (minutes < 60) {
+      return `${minutes} min`
+    } else {
+      const h = Math.floor(minutes / 60)
+      const m = minutes % 60
+      return m > 0 ? `${h}h ${m}min` : `${h}h`
+    }
+  }
+
+  const categories = [
+    { type: "dahira" as const, label: "Dahiras", color: "bg-purple-500" },
+    { type: "thiante" as const, label: "Thiantes", color: "bg-violet-500" },
+    { type: "eau" as const, label: "Point d'eau", color: "bg-blue-500" },
+    { type: "urgence" as const, label: "Urgence", color: "bg-red-500" },
+    { type: "mosquee" as const, label: "Mosquée", color: "bg-green-600" },
   ]
 
-  const mosqueeLocation = mockLocations.find((loc) => loc.type === "mosquee")
+  if (!user) {
+    return <WelcomePage onLogin={() => {}} />
+  }
 
-  if (user?.role === "responsable") {
+  if (user.role === "responsable") {
     return <ResponsableInterface />
   }
 
-  // Default interface for pèlerins
   return (
     <div className="h-screen flex flex-col">
-      <header className="border-b bg-background/95 backdrop-blur">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between gap-4">
-          <div className="flex flex-col flex-shrink-0">
-            <h1 className="text-base md:text-lg font-bold text-primary leading-tight">Magal Touba 2025</h1>
-            <p className="text-xs text-muted-foreground hidden sm:block">Guide du Pèlerin</p>
-          </div>
+      <Header />
 
-          <div className="flex items-center gap-2 flex-1 justify-end overflow-x-auto">
-            <Sheet open={mosqueeSheetOpen} onOpenChange={setMosqueeSheetOpen}>
-              <SheetTrigger asChild>
-                <Button variant="outline" size="sm" className="flex-shrink-0 bg-transparent">
-                  <Home className="h-4 w-4 mr-1" />
-                  <span className="hidden sm:inline">Mosquée</span>
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="bottom" className="h-[80vh]">
-                <SheetHeader>
-                  <SheetTitle>Grande Mosquée de Touba</SheetTitle>
-                  <SheetDescription>Informations et horaires</SheetDescription>
-                </SheetHeader>
-                {mosqueeLocation && (
-                  <div className="mt-4 space-y-4">
-                    <Card className="border-primary">
-                      <CardContent className="pt-6 space-y-4">
-                        <div className="p-4 bg-primary/10 rounded-lg">
-                          <div className="flex items-start gap-3">
-                            <Clock className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                            <div>
-                              <p className="font-medium text-sm mb-1">Horaires de visite</p>
-                              <p className="text-sm text-muted-foreground">{mosqueeLocation.horaires}</p>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <h4 className="font-medium text-sm">Informations importantes</h4>
-                          <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-                            <li>Tenue décente obligatoire</li>
-                            <li>Retirer vos chaussures avant d'entrer</li>
-                            <li>Respecter le silence et la prière</li>
-                            <li>Photos autorisées à l'extérieur uniquement</li>
-                          </ul>
-                        </div>
-
-                        <div className="space-y-2">
-                          <p className="text-sm">
-                            <span className="font-medium">Adresse:</span> {mosqueeLocation.address}
-                          </p>
-                        </div>
-
-                        <Button onClick={() => handleGetDirections(mosqueeLocation)} className="w-full">
-                          <Navigation className="h-4 w-4 mr-2" />
-                          Obtenir l'itinéraire
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  </div>
-                )}
-              </SheetContent>
-            </Sheet>
-
-            <Sheet open={locationsSheetOpen} onOpenChange={setLocationsSheetOpen}>
-              <SheetTrigger asChild>
-                <Button variant="outline" size="sm" className="flex-shrink-0 bg-transparent">
-                  <MapPin className="h-4 w-4 mr-1" />
-                  <span className="hidden sm:inline">Lieux</span>
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="bottom" className="h-[80vh]">
-                <SheetHeader>
-                  <SheetTitle>Tous les lieux</SheetTitle>
-                  <SheetDescription>Rechercher et filtrer les lieux</SheetDescription>
-                </SheetHeader>
-                <div className="mt-4 space-y-4">
-                  <div className="flex flex-wrap gap-2">
-                    {filterButtons.map(({ type, label, icon: Icon }) => (
-                      <Button
-                        key={type}
-                        variant={activeFilter === type ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setActiveFilter(type)}
-                        className="text-xs"
-                      >
-                        <Icon className="h-3 w-3 mr-1" />
-                        {label}
-                      </Button>
-                    ))}
-                  </div>
-
-                  <ScrollArea className="h-[calc(80vh-200px)]">
-                    <div className="space-y-2 pr-4">
-                      {filteredLocations.length === 0 ? (
-                        <Card>
-                          <CardContent className="py-8 text-center text-muted-foreground">
-                            Aucun lieu trouvé
-                          </CardContent>
-                        </Card>
-                      ) : (
-                        filteredLocations.map((location) => (
-                          <LocationCard
-                            key={location.id}
-                            location={location}
-                            onGetDirections={() => handleGetDirections(location)}
-                            onCheckIn={() => handleCheckIn(location)}
-                            userHasCheckedIn={checkedInLocations.has(location.id)}
-                          />
-                        ))
-                      )}
-                    </div>
-                  </ScrollArea>
-                </div>
-              </SheetContent>
-            </Sheet>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="flex-shrink-0 bg-transparent">
-                  <User className="h-4 w-4" />
-                  <span className="ml-1 hidden md:inline">{user?.name}</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Mon compte</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem disabled>
-                  <span className="text-xs text-muted-foreground">
-                    {user?.role === "admin" ? "Administrateur" : "Pèlerin"}
-                  </span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={logout}>
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Déconnexion
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+      <div className="border-b bg-background/95 backdrop-blur">
+        <div className="container mx-auto px-4 py-2">
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+            <Button
+              variant={activeFilter === null ? "default" : "outline"}
+              size="sm"
+              onClick={() => setActiveFilter(null)}
+              className="shrink-0"
+            >
+              Tout
+            </Button>
+            {categories.map((category) => (
+              <Button
+                key={category.type}
+                variant={activeFilter === category.type ? "default" : "outline"}
+                size="sm"
+                onClick={() => setActiveFilter(category.type)}
+                className="shrink-0"
+              >
+                <div className={`w-2 h-2 rounded-full ${category.color} mr-2`} />
+                {category.label}
+              </Button>
+            ))}
           </div>
         </div>
-      </header>
+      </div>
 
-      <main className="flex-1 relative">
+      <main className="flex-1 relative z-0">
         <MapView
           locations={filteredLocations}
           selectedLocation={selectedLocation}
-          onLocationSelect={(location) => {
-            setSelectedLocation(location)
-            setShowRoute(false)
-          }}
+          onLocationSelect={handleLocationSelect}
           showRoute={showRoute}
+          routeMode={routeMode}
           userLocation={userLocation}
+          searchQuery={searchQuery}
+          activeCategory={activeFilter}
         />
 
-        {showRoute && selectedLocation && (
-          <div className="absolute top-4 right-4 z-10">
-            <Button variant="destructive" size="sm" onClick={handleStopNavigation} className="shadow-lg">
-              Arrêter
-            </Button>
-          </div>
+        {/* Modal d'informations du lieu */}
+        <Dialog 
+          open={!!selectedLocation && !showRoute} 
+          onOpenChange={(open) => !open && handleCloseLocation()}
+        >
+          <DialogContent className="sm:max-w-[500px] max-h-[85vh] overflow-y-auto p-0 z-[100]">
+            {selectedLocation && (
+              <>
+                <DialogTitle className="sr-only">{selectedLocation.name}</DialogTitle>
+                <div className="relative">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-4 top-4 z-10 rounded-full bg-background/80 backdrop-blur hover:bg-background"
+                    onClick={handleCloseLocation}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                  <div className="p-6">
+                    <LocationCard
+                      location={selectedLocation}
+                      onGetDirections={() => handleGetDirections(selectedLocation)}
+                      onCheckIn={() => handleCheckIn(selectedLocation)}
+                      userHasCheckedIn={checkedInLocations.has(selectedLocation.id)}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog de choix de mode de transport */}
+        {selectedLocation && (
+          <RouteOptionsDialog
+            open={showRouteOptions}
+            onOpenChange={setShowRouteOptions}
+            location={selectedLocation}
+            userLocation={userLocation}
+            onSelectRoute={handleSelectRoute}
+          />
+        )}
+
+        {/* Panneau de navigation active */}
+        {showRoute && selectedLocation && routeMode && (
+          <ActiveRoutePanel
+            location={selectedLocation}
+            mode={routeMode}
+            distance={calculateDistance()}
+            duration={calculateDuration()}
+            onClose={handleCloseLocation}
+          />
         )}
       </main>
 
@@ -334,9 +261,7 @@ export function MainInterface() {
           <SearchBar
             onSearch={(query) => {
               setSearchQuery(query)
-              if (query) {
-                setLocationsSheetOpen(true)
-              }
+              setActiveFilter(null)
             }}
             placeholder="Rechercher un lieu..."
           />

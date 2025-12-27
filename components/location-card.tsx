@@ -1,128 +1,171 @@
 "use client"
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
+import { 
+  MapPin, 
+  Navigation, 
+  Phone, 
+  Users, 
+  CheckCircle2,
+  Clock,
+  Info
+} from "lucide-react"
 import type { Location } from "@/lib/mock-data"
-import { MapPin, Users, Phone, Navigation, CheckCircle } from "lucide-react"
 
 interface LocationCardProps {
   location: Location
-  onGetDirections?: () => void
-  onCheckIn?: () => void
-  userHasCheckedIn?: boolean
-}
-
-const typeLabels: Record<Location["type"], string> = {
-  mosquee: "Mosquée",
-  thiante: "Thiante",
-  dahira: "Dahira",
-  eau: "Point d'eau",
-  urgence: "Service d'urgence",
-  toilette: "Toilettes",
-  securite: "Sécurité",
-  boutique: "Boutique",
-  repos: "Espace de repos",
-}
-
-const typeColors: Record<Location["type"], string> = {
-  mosquee: "bg-primary text-primary-foreground",
-  thiante: "bg-accent text-accent-foreground",
-  dahira: "bg-accent text-accent-foreground",
-  eau: "bg-blue-500 text-white",
-  urgence: "bg-red-500 text-white",
-  toilette: "bg-purple-500 text-white",
-  securite: "bg-orange-500 text-white",
-  boutique: "bg-teal-500 text-white",
-  repos: "bg-green-500 text-white",
+  onGetDirections: () => void
+  onCheckIn: () => void
+  userHasCheckedIn: boolean
 }
 
 export function LocationCard({ location, onGetDirections, onCheckIn, userHasCheckedIn }: LocationCardProps) {
+  const getTypeLabel = (type: string) => {
+    const labels: Record<string, { label: string; color: string }> = {
+      mosquee: { label: "Mosquée", color: "bg-green-600" },
+      dahira: { label: "Dahira", color: "bg-purple-500" },
+      thiante: { label: "Thiante", color: "bg-violet-500" },
+      eau: { label: "Point d'eau", color: "bg-blue-500" },
+      urgence: { label: "Urgence", color: "bg-red-500" },
+      toilette: { label: "Toilettes", color: "bg-purple-600" },
+      securite: { label: "Sécurité", color: "bg-orange-500" },
+      boutique: { label: "Boutique", color: "bg-teal-500" },
+      repos: { label: "Repos", color: "bg-green-500" },
+    }
+    return labels[type] || { label: type, color: "bg-gray-500" }
+  }
+
+  const typeInfo = getTypeLabel(location.type)
+
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex-1">
-            <CardTitle className="text-lg leading-tight">{location.name}</CardTitle>
-            <CardDescription className="flex items-center gap-1 mt-1">
-              <MapPin className="h-3 w-3" />
-              <span className="text-xs">{location.address}</span>
-            </CardDescription>
-          </div>
-          <Badge className={typeColors[location.type]}>{typeLabels[location.type]}</Badge>
+    <div className="space-y-4">
+      {/* En-tête avec titre et badge */}
+      <div className="space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="text-2xl font-bold text-foreground pr-8">{location.name}</h2>
+          <Badge className={`${typeInfo.color} text-white shrink-0`}>
+            {typeInfo.label}
+          </Badge>
         </div>
-      </CardHeader>
 
-      <CardContent className="space-y-3">
-        {location.horaires && <p className="text-sm text-muted-foreground">{location.horaires}</p>}
+        {/* Adresse */}
+        <div className="flex items-start gap-2 text-muted-foreground">
+          <MapPin className="h-4 w-4 mt-0.5 shrink-0" />
+          <p className="text-sm">{location.address}</p>
+        </div>
+      </div>
 
+      <Separator />
+
+      {/* Informations détaillées */}
+      <div className="space-y-3">
         {location.responsable && (
-          <p className="text-sm">
-            <span className="font-medium">{"Responsable: "}</span>
-            {location.responsable}
-          </p>
-        )}
-
-        {location.capacity && (
-          <div className="flex items-center gap-2 text-sm">
-            <Users className="h-4 w-4 text-muted-foreground" />
-            <span>
-              {"Capacité: "}
-              {location.capacity} {" personnes"}
+          <div className="flex items-center gap-2">
+            <Info className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm">
+              <span className="text-muted-foreground">Responsable: </span>
+              <span className="font-medium">{location.responsable}</span>
             </span>
-          </div>
-        )}
-
-        {location.visiteurs !== undefined && (
-          <div className="flex items-center gap-2 text-sm">
-            <Users className="h-4 w-4 text-primary" />
-            <span className="font-medium">
-              {location.visiteurs} {" visiteurs présents"}
-            </span>
-          </div>
-        )}
-
-        {location.services && location.services.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {location.services.map((service, index) => (
-              <Badge key={index} variant="secondary" className="text-xs">
-                {service}
-              </Badge>
-            ))}
           </div>
         )}
 
         {location.phone && (
-          <div className="flex items-center gap-2 text-sm">
+          <div className="flex items-center gap-2">
             <Phone className="h-4 w-4 text-muted-foreground" />
-            <a href={`tel:${location.phone}`} className="text-primary hover:underline">
+            <a 
+              href={`tel:${location.phone}`} 
+              className="text-sm font-medium text-primary hover:underline"
+            >
               {location.phone}
             </a>
           </div>
         )}
 
-        <div className="flex gap-2 pt-2">
-          {onGetDirections && (
-            <Button onClick={onGetDirections} className="flex-1" size="sm">
-              <Navigation className="h-4 w-4 mr-2" />
-              Itinéraire
-            </Button>
-          )}
+        {location.capacity && (
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm">
+              <span className="text-muted-foreground">Capacité: </span>
+              <span className="font-medium">{location.capacity} personnes</span>
+            </span>
+          </div>
+        )}
 
-          {onCheckIn && (location.type === "dahira" || location.type === "thiante") && (
-            <Button
-              onClick={onCheckIn}
-              variant={userHasCheckedIn ? "secondary" : "default"}
-              className="flex-1"
-              size="sm"
-              disabled={userHasCheckedIn}
-            >
-              <CheckCircle className="h-4 w-4 mr-2" />
-              {userHasCheckedIn ? "Arrivé" : "J'arrive"}
-            </Button>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+        {location.visiteurs !== undefined && (
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm">
+              <span className="text-muted-foreground">Visiteurs actuels: </span>
+              <span className="font-medium text-primary">{location.visiteurs}</span>
+            </span>
+          </div>
+        )}
+
+        {location.horaires && (
+          <div className="flex items-start gap-2">
+            <Clock className="h-4 w-4 text-muted-foreground mt-0.5" />
+            <span className="text-sm">
+              <span className="text-muted-foreground">Horaires: </span>
+              <span className="font-medium">{location.horaires}</span>
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Services disponibles */}
+      {location.services && location.services.length > 0 && (
+        <>
+          <Separator />
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold text-foreground">Services disponibles</h3>
+            <div className="flex flex-wrap gap-2">
+              {location.services.map((service, index) => (
+                <Badge key={index} variant="secondary" className="text-xs">
+                  {service}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Consignes spéciales */}
+      {location.consignes && (
+        <>
+          <Separator />
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold text-foreground">Consignes</h3>
+            <p className="text-sm text-muted-foreground">{location.consignes}</p>
+          </div>
+        </>
+      )}
+
+      <Separator />
+
+      {/* Boutons d'action */}
+      <div className="flex flex-col gap-2">
+        <Button 
+          onClick={onGetDirections} 
+          className="w-full"
+          size="lg"
+        >
+          <Navigation className="h-4 w-4 mr-2" />
+          Voir l'itinéraire
+        </Button>
+
+        <Button
+          onClick={onCheckIn}
+          variant={userHasCheckedIn ? "secondary" : "outline"}
+          className="w-full"
+          size="lg"
+          disabled={userHasCheckedIn}
+        >
+          <CheckCircle2 className="h-4 w-4 mr-2" />
+          {userHasCheckedIn ? "Déjà enregistré" : "S'enregistrer ici"}
+        </Button>
+      </div>
+    </div>
   )
 }

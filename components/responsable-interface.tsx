@@ -1,8 +1,8 @@
 "use client"
 
 import type React from "react"
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import Image from "next/image"
 import { useAuth } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -21,7 +21,9 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
-import { LogOut, User, Plus, Users, MapPin } from "lucide-react"
+import { LogOut, User, Plus, Users, MapPin, Bell, Edit, Trash2, Search } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { mockLocations, type Location } from "@/lib/mock-data"
 
 interface Visitor {
@@ -32,10 +34,29 @@ interface Visitor {
   locationId: string
 }
 
+interface Notification {
+  id: string
+  locationId: string
+  visitorName: string
+  time: Date
+  read: boolean
+}
+
 export function ResponsableInterface() {
   const { user, logout } = useAuth()
   const { toast } = useToast()
-  const [view, setView] = useState<"add" | "visitors">("add")
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
+  const [isUpdateMode, setIsUpdateMode] = useState(false)
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
+  const [locationToDelete, setLocationToDelete] = useState<Location | null>(null)
+  const [selectedLocation, setSelectedLocation] = useState<Location | null>(null)
+  const [locations, setLocations] = useState<Location[]>([])
+  const [searchTerm, setSearchTerm] = useState("")
+  const [visitors, setVisitors] = useState<Visitor[]>([])
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [unreadCount, setUnreadCount] = useState(0)
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false)
 
   // Form state
   const [name, setName] = useState("")
@@ -47,23 +68,70 @@ export function ResponsableInterface() {
   const [longitude, setLongitude] = useState("")
   const [phone, setPhone] = useState("")
 
-  // Mock visitors data
-  const [visitors, setVisitors] = useState<Visitor[]>([
-    {
-      id: "1",
-      name: "Abdoulaye Diop",
-      phone: "+221 77 123 45 67",
-      checkInTime: new Date(),
-      locationId: "2",
-    },
-    {
-      id: "2",
-      name: "Fatou Sall",
-      phone: "+221 76 234 56 78",
-      checkInTime: new Date(Date.now() - 30 * 60000),
-      locationId: "2",
-    },
-  ])
+  // Charger les lieux et visiteurs mockés au montage
+  useEffect(() => {
+    const userLocations = mockLocations.filter(
+      (loc) => (loc.type === "dahira" || loc.type === "thiante") && loc.responsable === user?.name,
+    )
+    setLocations(userLocations)
+
+    // Visiteurs mockés
+    const mockVisitors: Visitor[] = [
+      {
+        id: "1",
+        name: "Abdoulaye Diop",
+        phone: "+221 77 123 45 67",
+        checkInTime: new Date(),
+        locationId: userLocations[0]?.id || "1",
+      },
+      {
+        id: "2",
+        name: "Fatou Sall",
+        phone: "+221 76 234 56 78",
+        checkInTime: new Date(Date.now() - 30 * 60000),
+        locationId: userLocations[0]?.id || "1",
+      },
+    ]
+    setVisitors(mockVisitors)
+  }, [user])
+
+  // Simulation de notifications en temps réel
+  useEffect(() => {
+    if (locations.length === 0) return
+
+    const interval = setInterval(() => {
+      const randomLocation = locations[Math.floor(Math.random() * locations.length)]
+      if (randomLocation) {
+        const newVisitor: Visitor = {
+          id: Math.random().toString(36).substr(2, 9),
+          name: `Nouveau Visiteur ${Math.floor(Math.random() * 100)}`,
+          phone: "+221 77 XXX XX XX",
+          checkInTime: new Date(),
+          locationId: randomLocation.id,
+        }
+
+        setVisitors(prev => [...prev, newVisitor])
+
+        const newNotification: Notification = {
+          id: Math.random().toString(36).substr(2, 9),
+          locationId: randomLocation.id,
+          visitorName: newVisitor.name,
+          time: new Date(),
+          read: false,
+        }
+
+        setNotifications(prev => [newNotification, ...prev])
+        setUnreadCount(prev => prev + 1)
+
+        toast({
+          title: "Nouvelle arrivée",
+          description: `${newVisitor.name} est arrivé à ${randomLocation.name}`,
+        })
+      }
+    }, 15000)
+
+    return () => clearInterval(interval)
+  }, [locations])
 
   const handleGetLocation = () => {
     if (navigator.geolocation) {
@@ -90,7 +158,6 @@ export function ResponsableInterface() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
-    // Validation
     if (!name || !address || !latitude || !longitude) {
       toast({
         title: "Formulaire incomplet",
@@ -100,9 +167,8 @@ export function ResponsableInterface() {
       return
     }
 
-    // Create new location
     const newLocation: Location = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: isUpdateMode && selectedLocation ? selectedLocation.id : Math.random().toString(36).substr(2, 9),
       name,
       type,
       address,
@@ -115,16 +181,29 @@ export function ResponsableInterface() {
       visiteurs: 0,
     }
 
-    // In production, this would be sent to backend
-    console.log("[v0] New location created:", newLocation)
+    if (isUpdateMode && selectedLocation) {
+      setLocations(prev => prev.map(loc => loc.id === selectedLocation.id ? newLocation : loc))
+      toast({
+        title: "Lieu mis à jour",
+        description: `Le lieu "${name}" a été mis à jour avec succès`,
+      })
+    } else {
+      setLocations([newLocation, ...locations])
+      toast({
+        title: "Lieu ajouté avec succès",
+        description: `${type === "dahira" ? "Le dahira" : "La thiante"} "${name}" a été créé(e)`,
+      })
+    }
 
-    toast({
-      title: "Lieu ajouté avec succès",
-      description: `${type === "dahira" ? "Le dahira" : "La thiante"} "${name}" a été créé(e)`,
-    })
+    resetForm()
+    setIsModalOpen(false)
+    setIsUpdateMode(false)
+    setSelectedLocation(null)
+  }
 
-    // Reset form
+  const resetForm = () => {
     setName("")
+    setType("dahira")
     setAddress("")
     setCapacity("")
     setServices("")
@@ -133,246 +212,487 @@ export function ResponsableInterface() {
     setPhone("")
   }
 
-  const myLocations = mockLocations.filter(
-    (loc) => (loc.type === "dahira" || loc.type === "thiante") && loc.responsable === user?.name,
+  const confirmDelete = (location: Location) => {
+    setLocationToDelete(location)
+    setIsDeleteConfirmOpen(true)
+  }
+
+  const handleDelete = () => {
+    if (locationToDelete) {
+      setLocations(prev => prev.filter(loc => loc.id !== locationToDelete.id))
+      toast({
+        title: "Lieu supprimé",
+        description: `Le lieu "${locationToDelete.name}" a été supprimé avec succès`,
+        variant: "destructive",
+      })
+      setIsDeleteConfirmOpen(false)
+      setIsDetailsModalOpen(false)
+    }
+  }
+
+  const openDetailsModal = (location: Location) => {
+    setSelectedLocation(location)
+    setIsDetailsModalOpen(true)
+  }
+
+  const openUpdateModal = (location: Location) => {
+    setSelectedLocation(location)
+    setIsUpdateMode(true)
+    setIsModalOpen(true)
+
+    setName(location.name)
+    setAddress(location.address)
+    setLatitude(location.lat.toString())
+    setLongitude(location.lng.toString())
+    setCapacity(location.capacity?.toString() || "")
+    setServices(location.services?.join(", ") || "")
+    setPhone(location.phone || "")
+  }
+
+  const markNotificationsAsRead = () => {
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })))
+    setUnreadCount(0)
+  }
+
+  const getVisitorsForLocation = (locationId: string) => {
+    return visitors.filter(v => v.locationId === locationId)
+  }
+
+  const filteredLocations = locations.filter(location =>
+    location.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    location.address.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <header className="border-b bg-background/95 backdrop-blur">
+    <div
+      className="min-h-screen flex flex-col bg-cover bg-center"
+      style={{
+        backgroundImage: "url('/images/touba-mosque.jpg')",
+        backgroundAttachment: "fixed"
+      }}
+    >
+      {/* Overlay pour améliorer la lisibilité */}
+      <div className="absolute inset-0 bg-black/10 backdrop-blur-sm"></div>
+
+      {/* Header */}
+      <header className="border-b bg-background/90 backdrop-blur-sm relative z-10">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex flex-col">
-            <h1 className="text-lg font-bold text-primary">Espace Responsable</h1>
-            <p className="text-xs text-muted-foreground">Magal Touba 2025</p>
+          <div className="flex items-center gap-4">
+            {/* Image circulaire ajoutée */}
+            <div className="relative h-12 w-12">
+              <Image
+                src="/images/logo-magal.png" // Remplacez par le chemin de votre image
+                alt="Logo Magal Touba"
+                fill
+                className="rounded-full object-cover border-2 border-primary"
+              />
+            </div>
+
+            {/* Texte Espace Responsable */}
+            <div className="flex flex-col">
+              <h1 className="text-lg font-bold text-primary">Responsable Dahira</h1>
+              <p className="text-xs text-muted-foreground">Magal bu Touba</p>
+            </div>
           </div>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                <User className="h-4 w-4 mr-2" />
-                {user?.name}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Mon compte</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem disabled>
-                <span className="text-xs text-muted-foreground">Responsable</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={logout}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Déconnexion
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="flex items-center gap-4">
+            <Popover open={isNotificationOpen} onOpenChange={setIsNotificationOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="relative"
+                  onClick={() => {
+                    if (unreadCount > 0) markNotificationsAsRead()
+                  }}
+                >
+                  <Bell className="h-5 w-5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                    </span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80">
+                <div className="space-y-4">
+                  <h4 className="font-medium">Notifications</h4>
+                  {notifications.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Aucune notification</p>
+                  ) : (
+                    <div className="space-y-3 max-h-64 overflow-y-auto">
+                      {notifications.map(notification => (
+                        <div
+                          key={notification.id}
+                          className={`p-3 rounded-lg border ${!notification.read ? 'bg-accent' : ''}`}
+                        >
+                          <p className="text-sm font-medium">
+                            {notification.visitorName} est arrivé à {
+                              locations.find(loc => loc.id === notification.locationId)?.name
+                            }
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {notification.time.toLocaleTimeString('fr-FR', {
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <User className="h-4 w-4 mr-2" />
+                  {user?.name}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Mon compte</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem disabled>
+                  <span className="text-xs text-muted-foreground">Responsable</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={logout}>
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Déconnexion
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </header>
 
-      <div className="border-b bg-muted/50">
+         {/* Message "Dalal ak jamm Djeuwrin" avec style amélioré */}
+      <div className="py-6 relative z-10">
         <div className="container mx-auto px-4">
-          <div className="flex gap-2 py-2">
-            <Button variant={view === "add" ? "default" : "ghost"} size="sm" onClick={() => setView("add")}>
-              <Plus className="h-4 w-4 mr-2" />
-              Ajouter un lieu
-            </Button>
-            <Button variant={view === "visitors" ? "default" : "ghost"} size="sm" onClick={() => setView("visitors")}>
-              <Users className="h-4 w-4 mr-2" />
-              Visiteurs ({visitors.length})
-            </Button>
+          <div className="bg-white/90 backdrop-blur-sm rounded-lg py-4 px-6 shadow-md max-w-2xl mx-auto">
+            <h2 className="text-2xl md:text-3xl font-bold text-center text-primary">
+              Dalal ak jamm Djeuwrin
+            </h2>
           </div>
         </div>
       </div>
 
-      <main className="flex-1 container mx-auto px-4 py-6">
-        {view === "add" ? (
-          <div className="max-w-2xl mx-auto space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Ajouter un nouveau lieu</CardTitle>
-                <CardDescription>Créez un dahira ou une thiante pour accueillir les pèlerins</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="type">Type de lieu *</Label>
-                    <Select value={type} onValueChange={(value: "dahira" | "thiante") => setType(value)}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="dahira">Dahira</SelectItem>
-                        <SelectItem value="thiante">Thiante</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Nom *</Label>
-                    <Input
-                      id="name"
-                      placeholder="Ex: Dahira Matlaboul Fawzaini"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      required
-                    />
-                  </div>
+      {/* Espacement entre le message et les activités récentes */}
+      <div className="h-8 md:h-12"></div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="address">Adresse *</Label>
-                    <Textarea
-                      id="address"
-                      placeholder="Ex: Quartier Darou Khoudoss, Touba"
-                      value={address}
-                      onChange={(e) => setAddress(e.target.value)}
-                      required
-                    />
-                  </div>
+      <main className="flex-1 container mx-auto px-4 py-6 relative z-10">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-xl font-semibold text-white">Activités récentes</h2>
+          <Button onClick={() => {
+            setIsUpdateMode(false)
+            resetForm()
+            setIsModalOpen(true)
+          }}>
+            <Plus className="h-4 w-4 mr-2" />
+            Ajouter un lieu
+          </Button>
+        </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="latitude">Latitude *</Label>
-                      <Input
-                        id="latitude"
-                        type="number"
-                        step="any"
-                        placeholder="Ex: 14.852"
-                        value={latitude}
-                        onChange={(e) => setLatitude(e.target.value)}
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="longitude">Longitude *</Label>
-                      <Input
-                        id="longitude"
-                        type="number"
-                        step="any"
-                        placeholder="Ex: -15.881"
-                        value={longitude}
-                        onChange={(e) => setLongitude(e.target.value)}
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <Button type="button" variant="outline" onClick={handleGetLocation} className="w-full bg-transparent">
-                    <MapPin className="h-4 w-4 mr-2" />
-                    Utiliser ma position actuelle
-                  </Button>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="capacity">Capacité d'accueil</Label>
-                    <Input
-                      id="capacity"
-                      type="number"
-                      placeholder="Ex: 500"
-                      value={capacity}
-                      onChange={(e) => setCapacity(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Téléphone</Label>
-                    <Input
-                      id="phone"
-                      type="tel"
-                      placeholder="Ex: +221 77 123 45 67"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="services">Services (séparés par des virgules)</Label>
-                    <Textarea
-                      id="services"
-                      placeholder="Ex: Hébergement, Restauration, Eau potable"
-                      value={services}
-                      onChange={(e) => setServices(e.target.value)}
-                    />
-                  </div>
-
-                  <Button type="submit" className="w-full">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Créer le lieu
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-
-            {myLocations.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Mes lieux</CardTitle>
-                  <CardDescription>Lieux que vous gérez</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {myLocations.map((location) => (
-                      <div key={location.id} className="flex items-start justify-between p-3 border rounded-lg">
-                        <div className="flex-1">
-                          <h3 className="font-medium">{location.name}</h3>
-                          <p className="text-sm text-muted-foreground">{location.address}</p>
-                          {location.visiteurs !== undefined && (
-                            <p className="text-sm text-primary mt-1">{location.visiteurs} visiteurs présents</p>
-                          )}
-                        </div>
-                        <Badge>{location.type === "dahira" ? "Dahira" : "Thiante"}</Badge>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+        {/* Barre de recherche */}
+        <div className="w-full mb-6">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Rechercher un lieu par nom ou adresse..."
+              className="pl-8"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
+        </div>
+
+        {filteredLocations.length === 0 ? (
+          <Card className="text-center py-12 bg-background/80">
+            <CardContent>
+              <p className="text-muted-foreground">Aucun lieu trouvé</p>
+            </CardContent>
+          </Card>
         ) : (
-          <div className="max-w-4xl mx-auto">
-            <Card>
-              <CardHeader>
-                <CardTitle>Liste des visiteurs</CardTitle>
-                <CardDescription>Pèlerins qui se sont enregistrés dans vos lieux</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ScrollArea className="h-[calc(100vh-300px)]">
-                  <div className="space-y-3">
-                    {visitors.length === 0 ? (
-                      <p className="text-center text-muted-foreground py-8">Aucun visiteur enregistré pour le moment</p>
-                    ) : (
-                      visitors.map((visitor) => {
-                        const location = mockLocations.find((loc) => loc.id === visitor.locationId)
-                        return (
-                          <div key={visitor.id} className="flex items-start justify-between p-4 border rounded-lg">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <User className="h-4 w-4 text-muted-foreground" />
-                                <h3 className="font-medium">{visitor.name}</h3>
-                              </div>
-                              <p className="text-sm text-muted-foreground mt-1">{visitor.phone}</p>
-                              <p className="text-sm text-primary mt-1">{location?.name}</p>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-xs text-muted-foreground">
-                                {visitor.checkInTime.toLocaleTimeString("fr-FR", {
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                })}
-                              </p>
-                              <Badge variant="secondary" className="mt-1">
-                                Présent
-                              </Badge>
-                            </div>
-                          </div>
-                        )
-                      })
-                    )}
-                  </div>
-                </ScrollArea>
-              </CardContent>
-            </Card>
+          <div className="space-y-4">
+            {filteredLocations.map((location) => {
+              const locationVisitors = getVisitorsForLocation(location.id)
+              return (
+                <Card
+                  key={location.id}
+                  className="hover:shadow-md transition-shadow cursor-pointer bg-background/80"
+                  onClick={() => openDetailsModal(location)}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="font-medium">{location.name}</h3>
+                        <p className="text-sm text-muted-foreground">{location.address}</p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <Users className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm">
+                            {locationVisitors.length} visiteurs présents
+                          </span>
+                        </div>
+                      </div>
+                      <Badge>{location.type === "dahira" ? "Dahira" : "Thiante"}</Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
           </div>
         )}
       </main>
+
+      {/* Footer */}
+      <footer className="border-t bg-background w-full py-6">
+        <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
+          <p>Magal Touba 2025 – Guide du Pèlerin</p>
+        </div>
+      </footer>
+
+      {/* Modale pour ajouter/mettre à jour un lieu */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="sm:max-w-[600px] bg-background">
+          <DialogHeader>
+            <DialogTitle>
+              {isUpdateMode ? "Mettre à jour le lieu" : "Ajouter un nouveau lieu"}
+            </DialogTitle>
+            <DialogDescription>
+              {isUpdateMode ? "Modifiez les informations du lieu" : "Créez un dahira ou une thiante pour accueillir les pèlerins"}
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="type">Type de lieu *</Label>
+              <Select value={type} onValueChange={(value: "dahira" | "thiante") => setType(value)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="z-[110]">
+                  <SelectItem value="dahira">Dahira</SelectItem>
+                  <SelectItem value="thiante">Thiante</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="name">Nom *</Label>
+              <Input
+                id="name"
+                placeholder="Ex: Dahira Matlaboul Fawzaini"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="address">Adresse *</Label>
+              <Textarea
+                id="address"
+                placeholder="Ex: Quartier Darou Khoudoss, Touba"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="latitude">Latitude *</Label>
+                <Input
+                  id="latitude"
+                  type="number"
+                  step="any"
+                  placeholder="Ex: 14.852"
+                  value={latitude}
+                  onChange={(e) => setLatitude(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="longitude">Longitude *</Label>
+                <Input
+                  id="longitude"
+                  type="number"
+                  step="any"
+                  placeholder="Ex: -15.881"
+                  value={longitude}
+                  onChange={(e) => setLongitude(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            <Button type="button" variant="outline" onClick={handleGetLocation} className="w-full bg-transparent">
+              <MapPin className="h-4 w-4 mr-2" />
+              Utiliser ma position actuelle
+            </Button>
+
+            <div className="space-y-2">
+              <Label htmlFor="capacity">Capacité d'accueil</Label>
+              <Input
+                id="capacity"
+                type="number"
+                placeholder="Ex: 500"
+                value={capacity}
+                onChange={(e) => setCapacity(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="phone">Téléphone</Label>
+              <Input
+                id="phone"
+                type="tel"
+                placeholder="Ex: +221 77 123 45 67"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="services">Services (séparés par des virgules)</Label>
+              <Textarea
+                id="services"
+                placeholder="Ex: Hébergement, Restauration, Eau potable"
+                value={services}
+                onChange={(e) => setServices(e.target.value)}
+              />
+            </div>
+
+            <DialogFooter>
+              <Button type="submit">
+                {isUpdateMode ? "Mettre à jour" : "Créer le lieu"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modale pour afficher les détails */}
+      <Dialog open={isDetailsModalOpen} onOpenChange={setIsDetailsModalOpen}>
+        {selectedLocation && (
+          <DialogContent className="sm:max-w-[600px] bg-background">
+            <DialogHeader>
+              <DialogTitle>{selectedLocation.name}</DialogTitle>
+              <DialogDescription>
+                Détails du {selectedLocation.type === "dahira" ? "dahira" : "thiante"}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Type</p>
+                  <p className="font-medium">
+                    {selectedLocation.type === "dahira" ? "Dahira" : "Thiante"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Responsable</p>
+                  <p className="font-medium">{selectedLocation.responsable}</p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">Adresse</p>
+                <p className="font-medium">{selectedLocation.address}</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Latitude</p>
+                  <p className="font-medium">{selectedLocation.lat}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Longitude</p>
+                  <p className="font-medium">{selectedLocation.lng}</p>
+                </div>
+              </div>
+
+              {selectedLocation.capacity && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Capacité</p>
+                  <p className="font-medium">{selectedLocation.capacity} personnes</p>
+                </div>
+              )}
+
+              {selectedLocation.phone && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Téléphone</p>
+                  <p className="font-medium">{selectedLocation.phone}</p>
+                </div>
+              )}
+
+              {selectedLocation.services && selectedLocation.services.length > 0 && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Services</p>
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    {selectedLocation.services.map((service, index) => (
+                      <Badge key={index} variant="secondary">
+                        {service}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <p className="text-sm text-muted-foreground">Visiteurs présents</p>
+                <p className="font-medium">
+                  {getVisitorsForLocation(selectedLocation.id).length} visiteurs
+                </p>
+              </div>
+            </div>
+
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                variant="outline"
+                onClick={() => openUpdateModal(selectedLocation)}
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                Modifier
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => confirmDelete(selectedLocation)}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Supprimer
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        )}
+      </Dialog>
+
+      {/* Modale de confirmation de suppression */}
+      <Dialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
+        <DialogContent className="sm:max-w-[425px] bg-background">
+          <DialogHeader>
+            <DialogTitle>Confirmer la suppression</DialogTitle>
+            <DialogDescription>
+              Êtes-vous sûr de vouloir supprimer "{locationToDelete?.name}" ? Cette action est irréversible.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="sm:justify-between">
+            <Button variant="outline" onClick={() => setIsDeleteConfirmOpen(false)}>
+              Annuler
+            </Button>
+            <Button variant="destructive" onClick={handleDelete}>
+              Supprimer définitivement
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
