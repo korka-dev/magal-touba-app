@@ -265,10 +265,9 @@ export function ResponsableInterface() {
 
   return (
     <div
-      className="min-h-screen flex flex-col bg-cover bg-center"
+      className="min-h-screen flex flex-col bg-cover bg-center md:bg-fixed"
       style={{
         backgroundImage: "url('/images/touba-mosque.jpg')",
-        backgroundAttachment: "fixed"
       }}
     >
       {/* Overlay pour améliorer la lisibilité */}
@@ -281,7 +280,7 @@ export function ResponsableInterface() {
             {/* Image circulaire ajoutée */}
             <div className="relative h-12 w-12">
               <Image
-                src="/images/logo-magal.png" // Remplacez par le chemin de votre image
+                src="/images/logo-magal.png"
                 alt="Logo Magal Touba"
                 fill
                 className="rounded-full object-cover border-2 border-primary"
@@ -370,7 +369,7 @@ export function ResponsableInterface() {
         </div>
       </header>
 
-         {/* Message "Dalal ak jamm Djeuwrin" avec style amélioré */}
+      {/* Message "Dalal ak jamm Djeuwrin" */}
       <div className="py-6 relative z-10">
         <div className="container mx-auto px-4">
           <div className="bg-white/90 backdrop-blur-sm rounded-lg py-4 px-6 shadow-md max-w-2xl mx-auto">
@@ -381,18 +380,23 @@ export function ResponsableInterface() {
         </div>
       </div>
 
-
-      {/* Espacement entre le message et les activités récentes */}
+      {/* Espacement */}
       <div className="h-8 md:h-12"></div>
 
+      {/* Main Content */}
       <main className="flex-1 container mx-auto px-4 py-6 relative z-10">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-semibold text-white">Activités récentes</h2>
-          <Button onClick={() => {
-            setIsUpdateMode(false)
-            resetForm()
-            setIsModalOpen(true)
-          }}>
+        <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+          <h2 className="text-xl font-semibold text-white w-full md:w-auto text-center md:text-left">
+            Activités récentes
+          </h2>
+          <Button
+            onClick={() => {
+              setIsUpdateMode(false)
+              resetForm()
+              setIsModalOpen(true)
+            }}
+            className="w-full md:w-auto"
+          >
             <Plus className="h-4 w-4 mr-2" />
             Ajouter un lieu
           </Button>
@@ -405,32 +409,33 @@ export function ResponsableInterface() {
             <Input
               type="search"
               placeholder="Rechercher un lieu par nom ou adresse..."
-              className="pl-8"
+              className="pl-8 w-full"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
         </div>
 
+        {/* Liste des lieux */}
         {filteredLocations.length === 0 ? (
-          <Card className="text-center py-12 bg-background/80">
+          <Card className="text-center py-12 bg-background/80 w-full">
             <CardContent>
               <p className="text-muted-foreground">Aucun lieu trouvé</p>
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-4 w-full">
             {filteredLocations.map((location) => {
               const locationVisitors = getVisitorsForLocation(location.id)
               return (
                 <Card
                   key={location.id}
-                  className="hover:shadow-md transition-shadow cursor-pointer bg-background/80"
+                  className="hover:shadow-md transition-shadow cursor-pointer bg-background/80 w-full"
                   onClick={() => openDetailsModal(location)}
                 >
                   <CardContent className="p-4">
-                    <div className="flex justify-between items-start">
-                      <div>
+                    <div className="flex flex-col md:flex-row justify-between items-start gap-4">
+                      <div className="w-full md:w-auto">
                         <h3 className="font-medium">{location.name}</h3>
                         <p className="text-sm text-muted-foreground">{location.address}</p>
                         <div className="flex items-center gap-2 mt-2">
@@ -440,7 +445,9 @@ export function ResponsableInterface() {
                           </span>
                         </div>
                       </div>
-                      <Badge>{location.type === "dahira" ? "Dahira" : "Thiante"}</Badge>
+                      <Badge className="w-full md:w-auto text-center">
+                        {location.type === "dahira" ? "Dahira" : "Thiante"}
+                      </Badge>
                     </div>
                   </CardContent>
                 </Card>
@@ -459,7 +466,7 @@ export function ResponsableInterface() {
 
       {/* Modale pour ajouter/mettre à jour un lieu */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-[600px] bg-background">
+        <DialogContent className="sm:max-w-[600px] w-[95vw] bg-background max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {isUpdateMode ? "Mettre à jour le lieu" : "Ajouter un nouveau lieu"}
@@ -570,7 +577,7 @@ export function ResponsableInterface() {
             </div>
 
             <DialogFooter>
-              <Button type="submit">
+              <Button type="submit" className="w-full md:w-auto">
                 {isUpdateMode ? "Mettre à jour" : "Créer le lieu"}
               </Button>
             </DialogFooter>
@@ -581,7 +588,7 @@ export function ResponsableInterface() {
       {/* Modale pour afficher les détails */}
       <Dialog open={isDetailsModalOpen} onOpenChange={setIsDetailsModalOpen}>
         {selectedLocation && (
-          <DialogContent className="sm:max-w-[600px] bg-background">
+          <DialogContent className="sm:max-w-[600px] w-[95vw] bg-background max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{selectedLocation.name}</DialogTitle>
               <DialogDescription>
@@ -658,6 +665,7 @@ export function ResponsableInterface() {
               <Button
                 variant="outline"
                 onClick={() => openUpdateModal(selectedLocation)}
+                className="w-full md:w-auto"
               >
                 <Edit className="h-4 w-4 mr-2" />
                 Modifier
@@ -665,6 +673,7 @@ export function ResponsableInterface() {
               <Button
                 variant="destructive"
                 onClick={() => confirmDelete(selectedLocation)}
+                className="w-full md:w-auto"
               >
                 <Trash2 className="h-4 w-4 mr-2" />
                 Supprimer
@@ -676,7 +685,7 @@ export function ResponsableInterface() {
 
       {/* Modale de confirmation de suppression */}
       <Dialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
-        <DialogContent className="sm:max-w-[425px] bg-background">
+        <DialogContent className="sm:max-w-[425px] w-[95vw] bg-background">
           <DialogHeader>
             <DialogTitle>Confirmer la suppression</DialogTitle>
             <DialogDescription>
@@ -684,10 +693,10 @@ export function ResponsableInterface() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="sm:justify-between">
-            <Button variant="outline" onClick={() => setIsDeleteConfirmOpen(false)}>
+            <Button variant="outline" onClick={() => setIsDeleteConfirmOpen(false)} className="w-full md:w-auto">
               Annuler
             </Button>
-            <Button variant="destructive" onClick={handleDelete}>
+            <Button variant="destructive" onClick={handleDelete} className="w-full md:w-auto">
               Supprimer définitivement
             </Button>
           </DialogFooter>
